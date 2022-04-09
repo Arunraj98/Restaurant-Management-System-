@@ -1,0 +1,275 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+
+using System.IO;
+using System.Configuration;
+using System.Data;
+using MySql.Data.MySqlClient;
+
+using System.IO;
+using System.Configuration;
+using System.Data;
+using MySql.Data.MySqlClient;
+using System.Net.Mail;
+using System.Net;
+
+public partial class CustomerDesigncost : System.Web.UI.Page
+{
+    public string ConString = ConfigurationManager.ConnectionStrings["cybenko"].ConnectionString;
+    protected void Page_Load(object sender, EventArgs e)
+    {
+
+
+
+        if (!this.IsPostBack)
+        {
+            this.BindGrid();
+        }
+    }
+    private void BindGrid()
+    {
+        DataTable dt = new DataTable();
+        MySqlConnection con = new MySqlConnection(ConString);
+        MySqlDataAdapter adapt = new MySqlDataAdapter("SELECT reservation.payid,reservation.hours,reservation.rdate,reservation.no_of_seats,reservation.type,reservation.time,reservation.date,reservation.bstatus,reservation.amount,reservation.name,reservation.phone,reservation.status,reservation.mode FROM reservation where reservation.email='" + Session["user"].ToString() + "'", con);
+        con.Open();
+        adapt.Fill(dt);
+        con.Close();
+
+        GridView2.DataSource = dt;
+        GridView2.DataBind();
+
+
+
+
+
+    }
+
+
+    protected void GridView2_PageIndexChanging(object sender, GridViewPageEventArgs e)
+    {
+        GridView2.PageIndex = e.NewPageIndex;
+        this.BindGrid();
+
+    }
+
+
+
+
+
+    protected void OnRowDataBound(object sender, GridViewRowEventArgs e)
+    {
+
+    }
+    protected void GridView1_RowEditing(object sender, GridViewEditEventArgs e)
+    {
+        GridView2.EditIndex = e.NewEditIndex;
+        this.BindGrid();
+    }
+    protected void GridView1_RowUpdating(object sender, GridViewUpdateEventArgs e)
+    {
+
+
+        GridViewRow row = GridView2.Rows[e.RowIndex];
+        int did = Convert.ToInt32(GridView2.DataKeys[e.RowIndex].Values[0]);
+
+        string name = Session["user"].ToString();
+        // string address = (row.FindControl("txt_address")as TextBox).Text;
+        //string place = (row.FindControl("txt_place") as TextBox).Text;
+        string date = (row.FindControl("d") as Label).Text;
+
+        // string username = (row.FindControl("lbl_email") as Label).Text;
+        int amount = Convert.ToInt16((row.FindControl("amount") as Label).Text);
+        Session["amount"] = amount;
+        Session["designname"] = (row.FindControl("tid") as Label).Text;
+        Session["date"] = date.ToString();
+        // string amount = (row.FindControl("TextBox1") as TextBox).Text;
+        Session["email"] = name.ToString();
+
+
+
+        MySqlConnection con23 = new MySqlConnection(ConString);
+        con23.Open();
+        MySqlCommand cmd23 = new MySqlCommand("select bstatus from reservation where payid='" + did + "'", con23);
+
+        string stat = cmd23.ExecuteScalar().ToString();
+
+        if (stat == "Cancelled")
+        {
+          
+        
+
+            Response.Write("<script>alert('Already cancelled ')</script>");
+        
+        
+        }
+
+             
+
+        else
+        {
+
+
+
+
+
+
+            string status = (row.FindControl("DropStatus") as DropDownList).Text;
+            if (status == "Confirmed")
+            {
+                Response.Redirect("~/advancepayment.aspx");
+            }
+            else
+            {
+
+
+
+
+
+
+
+                string query = "UPDATE reservation SET bstatus=@status WHERE payid=@did";
+
+                using (MySqlConnection con = new MySqlConnection(ConString))
+                {
+                    using (MySqlCommand cmd = new MySqlCommand(query))
+                    {
+
+
+                        cmd.Parameters.AddWithValue("@did", did);
+                        cmd.Parameters.AddWithValue("@status", status);
+                        // cmd.Parameters.AddWithValue("@amount", amount);
+                        cmd.Connection = con;
+                        con.Open();
+                        cmd.ExecuteNonQuery();
+
+
+
+                        MySqlConnection con2 = new MySqlConnection(ConString);
+                        con2.Open();
+                        MySqlCommand cmd2 = new MySqlCommand("select username from login where role='Order management manager'", con2);
+
+                        string username = cmd2.ExecuteScalar().ToString();
+
+
+
+
+
+
+
+                        MailMessage MyMailMessage = new MailMessage();
+
+                        MyMailMessage.From = new MailAddress("rmsminiproject@gmail.com");
+
+
+                        MyMailMessage.To.Add(username);
+
+                        MyMailMessage.Subject = "Reservation cancelled";
+
+                        MyMailMessage.Body = "Reservation with booking no:" + did + ", submitted for date " + date + " has been cancelled by customer";
+
+                        MyMailMessage.IsBodyHtml = true;
+
+                        SmtpClient SMTPServer = new SmtpClient("smtp.gmail.com");
+
+                        SMTPServer.Port = 587;
+
+                        SMTPServer.Credentials = new System.Net.NetworkCredential("rmsminiproject@gmail.com", "@rmsminiproject1");
+
+                        SMTPServer.EnableSsl = true;
+
+                        try
+                        {
+
+                            SMTPServer.Send(MyMailMessage);
+                            Response.Write("<script>alert('success!! Please note that there is no refunding in cancellation of reservation ')</script>");
+
+
+
+
+
+
+
+
+                        }
+
+                        catch (Exception ex)
+                        {
+
+                            // string msg = "Hi , your salary has ben credited Application  has been for";
+                            // SendSMS("8078296466", msg);
+
+
+
+
+                        }
+
+                        con.Close();
+                    }
+                }
+                GridView2.EditIndex = -1;
+                this.BindGrid();
+
+
+
+
+
+
+
+
+
+
+
+            }
+
+
+
+
+
+        }
+
+    }
+
+
+
+    protected void GridView1_RowCancelingEdit(object sender, GridViewCancelEditEventArgs e)
+    {
+        GridView2.EditIndex = -1;
+        this.BindGrid();
+    }
+    /* protected void GridView1_RowDeleting(object sender, GridViewDeleteEventArgs e)
+     {
+         int bno = Convert.ToInt32(GridView1.DataKeys[e.RowIndex].Values[0]);
+         string query = "DELETE FROM patient_test WHERE booking_no=@Bno";
+
+         using (MySqlConnection con = new MySqlConnection(ConString))
+         {
+             using (MySqlCommand cmd = new MySqlCommand(query))
+             {
+                 cmd.Parameters.AddWithValue("@Bno", bno);
+                 cmd.Connection = con;
+                 con.Open();
+                 cmd.ExecuteNonQuery();
+                 con.Close();
+             }
+         }
+
+         this.BindGrid();
+     }
+     * */
+    protected void GridView1_SelectedIndexChanged(object sender, EventArgs e)
+    {
+
+    }
+    protected void GridView2_SelectedIndexChanged(object sender, EventArgs e)
+    {
+
+    }
+
+
+
+
+}
